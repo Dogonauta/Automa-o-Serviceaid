@@ -1,4 +1,6 @@
 import openpyxl
+import os
+from dotenv import load_dotenv
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 import chromedriver_autoinstaller
@@ -8,9 +10,10 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from time import sleep
 
+load_dotenv()
 
-# Entrar na planilha e extrair dados
-
+User = os.getenv("User")
+senha = os.getenv("senha")  
 
 lista_chamados = openpyxl.load_workbook('tickets.xlsx')
 pagina_lista_chamados = lista_chamados['Plan1']
@@ -20,12 +23,16 @@ driver.get('https://csm2.serviceaide.com/#login')
 sleep(2)
 def logar():
 
-    login = driver.find_element(By.XPATH, "//input[@placeholder='USER NAME']")
-    login.send_keys("Gabriel.siqueira@dasa.com.br")
+    login = WebDriverWait(driver, 20).until(
+    EC.presence_of_element_located((By.XPATH, "//input[@placeholder='USER NAME']"))
+    )
+    login.send_keys(User)
     login.send_keys(Keys.TAB)
 
-    senha = driver.find_element(By.XPATH, "//input[@name='password']")
-    senha.send_keys("Ezio@uditore20")
+    senha = WebDriverWait(driver, 20).until(
+    EC.presence_of_element_located((By.XPATH, "//input[@name='password']"))
+    )
+    senha.send_keys(senha)
 
     confirmar = WebDriverWait(driver, 20).until(
     EC.presence_of_element_located((By.XPATH, "//span[contains(text(),'SIGN IN')]"))
