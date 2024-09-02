@@ -1,19 +1,23 @@
 import openpyxl
-import os
 from dotenv import load_dotenv
+import os
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
-import chromedriver_autoinstaller
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from time import sleep
 
+possiveis_status = [
+    "Em andamento", "Resolvido", "Execução pendente",
+    "Resposta do Cliente", "Pendente Material", "Aceitação",
+    "Cadastro contábil", "Pendente Fornecedor"
+]
 load_dotenv()
 
 User = os.getenv("User")
-senha = os.getenv("senha")  
+Senha = os.getenv("Senha")
 
 lista_chamados = openpyxl.load_workbook('tickets.xlsx')
 pagina_lista_chamados = lista_chamados['Plan1']
@@ -29,10 +33,8 @@ def logar():
     login.send_keys(User)
     login.send_keys(Keys.TAB)
 
-    senha = WebDriverWait(driver, 20).until(
-    EC.presence_of_element_located((By.XPATH, "//input[@name='password']"))
-    )
-    senha.send_keys(senha)
+    senha = driver.find_element(By.XPATH, "//input[@name='password']")
+    senha.send_keys(Senha)
 
     confirmar = WebDriverWait(driver, 20).until(
     EC.presence_of_element_located((By.XPATH, "//span[contains(text(),'SIGN IN')]"))
@@ -44,6 +46,12 @@ def testar_status():
     status_chamado = WebDriverWait(driver, 20).until(
     EC.presence_of_element_located((By.XPATH, "/html/body/div[3]/div[2]/div[1]/div/div[2]/div[3]/div/div[2]/div/div/div/div[2]/div[2]/div[1]/div[2]/div[2]/div[6]/div/div/div[3]"))
     )
+    sleep(1)
+    if status_chamado.text not in possiveis_status:
+        status_chamado = WebDriverWait(driver, 20).until(
+        EC.presence_of_element_located((By.XPATH, "/html/body/div[3]/div[2]/div[1]/div/div[2]/div[3]/div/div[2]/div/div/div/div[2]/div[2]/div[1]/div[2]/div[2]/div[7]/div/div/div[3]"))
+        )
+    
     return status_chamado
 
 def pesquisar_chamado():
@@ -60,7 +68,7 @@ def pesquisar_chamado():
     consulta.send_keys(chamado)
     consulta.send_keys(Keys.ENTER)
         
-    caso = WebDriverWait(driver, 20).until(
+    caso = WebDriverWait(driver, 50).until(
     EC.presence_of_element_located((By.XPATH, "//a[@tabindex='1']"))
     )
     caso.click()
@@ -96,139 +104,146 @@ def atender_chamado():
     )
     visivel_cliente.click()
     sleep(0.5)
-    acao.click()
+    botao_de_acao()
     sleep(0.5)
 
-    atualizar_cadastro = WebDriverWait(driver, 20).until(
-    EC.presence_of_element_located((By.XPATH, "//span[contains(text(), 'Atualizar cadastro')]"))
-    )
-    atualizar_cadastro.click()
-    sleep(1)
+    try: 
+        botao_atualizar_cadastro()
+        sleep(1)
+    except:
+        print("chamado sem botao de atualizar cadastro")
     resolver_chamado()
 
 def resolver_chamado():
-
-    acao.click()
+    sleep(1)
+    botao_de_acao()
+    sleep(1)
+    try:
+        botao_de_retomar()
+    except:
+        print("chamado ja aberto, e sem botão de 'retomar'")
+    sleep(1)
+    dar_resolucao()
+    sleep(1.5)
+    botao_de_acao()
     sleep(0.5)
-    retomar = WebDriverWait(driver, 20).until(
-    EC.presence_of_element_located((By.XPATH, "//span[contains(text(), 'Retomar solicitação')]"))
-    )
-    
-    retomar.click()
-    sleep(1)
-
-    resolucao = WebDriverWait(driver, 20).until(
-    EC.presence_of_element_located((By.XPATH, "//textarea[@autoidentifier='txtbox_Resolution']"))
-    )
-
-    resolucao.clear()
-    sleep(1)
-    resolucao.send_keys("Chamado encerrado conforme inventário 2023.")
-    sleep(1)
-    resolucao.send_keys(Keys.TAB)
-    acao.click()
-    sleep(0.5)
-
-    resolver = WebDriverWait(driver, 20).until(
-    EC.presence_of_element_located((By.XPATH, "//span[contains(text(),'Resolver solicitação')]"))
-    )
-    
-    resolver.click()
+    botao_de_resolver()
     sleep(2)
-
-    subir_aba = WebDriverWait(driver, 20).until(
-    EC.presence_of_element_located((By.XPATH, "//button[@id='back-btnEl']"))
-    )
-    subir_aba.click()
-    resolucao.text
     alimentar_nova_planilha()
     fechar_chamado()
     
 def fechar_chamado():
     sleep(0.5)
-    fechar_aba = WebDriverWait(driver, 10).until(
+    subir_aba()
+    fechar_aba = WebDriverWait(driver, 2).until(
     EC.element_to_be_clickable((By.XPATH, "//a[@class='x-tab-close-btn']"))
     )
-    fechar_aba.click()  
+    fechar_aba.click()
+
+def botao_de_acao():
+    acao = WebDriverWait(driver, 20).until(
+    EC.visibility_of_element_located((By.XPATH, "//button[@id='ca-global-actions-menu-btnEl']"))
+    )
+    WebDriverWait(driver, 20).until(
+        EC.element_to_be_clickable((acao))
+    )
+    acao.click()
+
+def botao_de_aceitacao():
+    aceitar_solicitacao = WebDriverWait(driver, 20).until(
+    EC.presence_of_element_located((By.XPATH, "//span[contains(text(),'Aceitar solicitação')]"))
+    )
+    aceitar_solicitacao.click()
+
+def botao_atualizar_cadastro():
+    atualizar_cadastro = WebDriverWait(driver, 2).until(
+    EC.presence_of_element_located((By.XPATH, "//span[contains(text(), 'Atualizar cadastro')]"))
+    )
+    atualizar_cadastro.click()
+
+def botao_de_retomar():
+    retomar = WebDriverWait(driver, 5).until(
+    EC.presence_of_element_located((By.XPATH, "//span[contains(text(),'Retomar solicitação')]"))
+    )
+    retomar.click()
+
+def botao_de_resolver():
+    resolver = WebDriverWait(driver, 20).until(
+    EC.presence_of_element_located((By.XPATH, "//span[contains(text(),'Resolver solicitação')]"))
+    )
+    resolver.click()
+
+def dar_resolucao():
+    resolucao = WebDriverWait(driver, 20).until(
+    EC.presence_of_element_located((By.XPATH, "//textarea[@autoidentifier='txtbox_Resolution']"))
+    ) 
+    resolucao.send_keys(Keys.CONTROL + "a") 
+    resolucao.send_keys("Chamado encerrado conforme inventário 2023.")
+    sleep(1)
+    resolucao.send_keys(Keys.TAB)
 
 def alimentar_nova_planilha():
     resolucao = WebDriverWait(driver, 20).until(
-    EC.presence_of_element_located((By.XPATH, "//textarea[@autoidentifier='txtbox_Resolution']"))
-    )
-    conferencia = resolucao.text
+    EC.visibility_of_element_located((By.XPATH, "//textarea[@autoidentifier='txtbox_Resolution']"))
+    ) 
+    subir_aba()
+    conferencia_texto_resolucao = resolucao.get_attribute("value")
+    conferencia_status_chamado = testar_status()
     tickets_concluidos = openpyxl.load_workbook('tickets_concluidos.xlsx')
     pagina_tickets = tickets_concluidos['Plan1']
-    pagina_tickets.append([chamado,"Concluido", conferencia , status_chamado.text ,motivo, descrição, Abertoem, Atualizado, Prioridade, Solicitante, Organizaçãodosolicitante, Atribuído, Grupoatribuído, Tipodeticket, Resolverem, StatusdoSLA, Organizaçãodobeneficiário, SelecioneaUnidade, Categorização] )
+    pagina_tickets.append([chamado,"Concluido", conferencia_texto_resolucao, conferencia_status_chamado.text, motivo, descrição, Abertoem, Atualizado, Prioridade, Solicitante, Organizaçãodosolicitante, Atribuído, Grupoatribuído, Tipodeticket, Resolverem, StatusdoSLA, Organizaçãodobeneficiário, SelecioneaUnidade, Categorização])
     tickets_concluidos.save('tickets_concluidos.xlsx')
 
+def subir_aba():
+    driver.execute_script("window.scrollTo(0, 0);")
 
 logar()
 
-for linha in pagina_lista_chamados.iter_rows(min_row=2, values_only=True):
+for linha in pagina_lista_chamados.iter_rows(min_row=676, values_only=True):
     chamado, status, motivo, descrição, Abertoem, Atualizado, Prioridade, Solicitante, Organizaçãodosolicitante, Atribuído, Grupoatribuído, Tipodeticket, Resolverem, StatusdoSLA, Organizaçãodobeneficiário, SelecioneaUnidade, Categorização = linha
 
     pesquisar_chamado()
     status_chamado = testar_status()
-
+    
     if status_chamado.text == "Resolvido":
         alimentar_nova_planilha()
         fechar_chamado()
         continue
-
-    acao = WebDriverWait(driver, 20).until(
-    EC.presence_of_element_located((By.XPATH, "//button[@id='ca-global-actions-menu-btnEl']"))
-    )
         
     if status_chamado.text == "Pendente Fornecedor":
-        
-        acao.click()
+        botao_de_acao()
         sleep(0.5)
-        retomar = WebDriverWait(driver, 20).until(
-        EC.presence_of_element_located((By.XPATH, "//span[contains(text(),'Retomar solicitação')]"))
-    )
-        retomar.click()
+        botao_de_retomar()
         atender_chamado()
     
     elif status_chamado.text == "Cadastro contábil":
         resolver_chamado()
 
     elif status_chamado.text == "Aceitação":
-
-        acao.click()
-        sleep(0.5)
-        aceitar_solicitacao = WebDriverWait(driver, 20).until(
-        EC.presence_of_element_located((By.XPATH, "//span[contains(text(),'Aceitar solicitação')]"))
-        )
+        botao_de_acao()
+        botao_de_aceitacao()
         atender_chamado()
 
     elif status_chamado.text == "Pendente Material":
-
-        acao.click()
+        botao_de_acao()
         sleep(0.5)
-        retomar = WebDriverWait(driver, 20).until(
-        EC.presence_of_element_located((By.XPATH, "//span[contains(text(),'Retomar solicitação')]"))
-        )
-        retomar.click()
+        botao_de_retomar()
         atender_chamado()
 
     elif status_chamado.text == "Resposta do Cliente":
-
-        acao.click()
+        botao_de_acao()
         sleep(0.5)
-        aceitar_solicitacao = WebDriverWait(driver, 20).until(
-        EC.presence_of_element_located((By.XPATH, "//span[contains(text(),'Aceitar solicitação')]"))
-        )
+        botao_de_aceitacao()
         atender_chamado()
     
     elif status_chamado.text == "Execução pendente":
-        acao.click()
+        botao_de_acao()
         sleep(0.5)
-
-        retomar = WebDriverWait(driver, 20).until(
-        EC.presence_of_element_located((By.XPATH, "//span[contains(text(),'Retomar solicitação')]"))
-        )
-        retomar.click()
+        botao_de_retomar()
         atender_chamado()
 
     elif status_chamado.text == "Em andamento":
+        atender_chamado()
+
+    else:
         atender_chamado()
